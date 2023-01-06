@@ -91,7 +91,9 @@ async function installFirebuildLinux() : Promise<void> {
   isPublicRepo = (await fetch(`https://github.com/${process.env.GITHUB_REPOSITORY}`)).ok;
   const actorSha256 = isPublicRepo ? "" : (await getExecBashOutput(`echo ${process.env.GITHUB_ACTOR} | sha256sum | cut -f1 -d" "`)).stdout;
 
-  const acceptLicense = (await fetch(`https://firebuild.com/firebuild-gh-app/query?user=${process.env.GITHUB_REPOSITORY_OWNER}&actor_sha256=${actorSha256}`)).ok;
+  // When the license server is down let the action proceed and assume having a license
+  const queryWorks = (await fetch(`https://firebuild.com/firebuild-gh-app/query?user=firebuild`)).ok;
+  const acceptLicense = queryWorks ? (await fetch(`https://firebuild.com/firebuild-gh-app/query?user=${process.env.GITHUB_REPOSITORY_OWNER}&actor_sha256=${actorSha256}`)).ok : true;
   if (acceptLicense) {
     await execBashSudo("sh -c 'echo debconf firebuild/license-accepted select true | debconf-set-selections'");
     await execBashSudo(`sh -c 'add-apt-repository -y ppa:firebuild/stable || (printf \"\\n${ppaKey}\" > /etc/apt/trusted.gpg.d/firebuild-ppa.asc && printf \"deb http://ppa.launchpadcontent.net/firebuild/stable/ubuntu $(. /etc/lsb-release ; echo $DISTRIB_CODENAME) main universe\" > /etc/apt/sources.list.d/firebuild-stable-ppa.list && apt-get -qq update)'`);
